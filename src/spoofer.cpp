@@ -204,24 +204,34 @@ void PrintInterfaces() {
         cout<<*it<<endl;
 }
 
-int main(int argc, char **argv) {
-    string new_name;
-    string new_mac;
-    char c;
-
-    char *cmd = new char[256];
-
-    /*cout<<"Getting PC name..."<<endl;
+void PrintCurrentName() {
     string current_name = GetCurrentName();
     if(current_name == " ") {
-        cout<<"Warning! PC name couldn't be retrieved."<<endl;
+        cout<<"PC name couldn't be retrieved."<<endl;
     } else {
-        cout<<"Current name: "<<current_name;
+        cout<<"Current name: "<<current_name<<endl;
     }
-    */
+}
 
-    /*cout<<"Enter new name: ";
-    cin>>new_name;*/
+void ChangeName(string currentName, string newName) {
+    string cmd = "WMIC computersystem where caption=’"+ currentName +"‘ rename " + newName;
+    system(cmd.c_str());
+}
+
+void ChangeAddr(string newAddr) {
+    //Change the MAC Address of the first 2 interfaces listed
+    for(int i=0;i<=2;i++) {
+        cout<<"Changing address of interface #" <<i<<endl;
+        string cmd = "reg add HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4D36E972-E325-11CE-BFC1-08002BE10318}\\000" + to_string(i) + " /v NetworkAddress /d " + newAddr + " /f";
+
+        system(cmd.c_str());
+    }
+}
+
+
+int main(int argc, char **argv) {
+    string new_mac;
+    char c;
 
     cout<<"List of MAC Addresses: ";
     PrintMAC();
@@ -243,22 +253,9 @@ int main(int argc, char **argv) {
     cout<<"Enter new MAC: ";
     cin>>new_mac;
 
-  //Execute command to change computer name
-  //system("WMIC computersystem where caption=’"+ current_name +"‘ rename " + new_name);
-
     DisableAllInterfaces();
 
-    for(int i=0;i<=2;i++) {
-        //Change the MAC Address of the first 2 interfaces listed
-        cout<<"Changing address of interface #" <<i<<endl;
-        strcpy(cmd, "reg add HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4D36E972-E325-11CE-BFC1-08002BE10318}\\000");
-        strcat(cmd, to_string(i).c_str());
-        strcat(cmd, " /v NetworkAddress /d ");
-        strcat(cmd, new_mac.c_str());
-        strcat(cmd, " /f");
-
-        system(cmd);
-    }
+    ChangeAddr(new_mac);
 
     EnableAllInterfaces();
 
