@@ -5,6 +5,7 @@
 #include <fstream>
 #include <string>
 #include <vector>
+#include <regex>
 #include <windows.h>
 #include "text.h"
 
@@ -137,9 +138,30 @@ void PrintInterfaces() {
         cout<<*it<<endl;
 }
 
-
-
 void ChangeAddr(string newAddr) {
+    for(int i=0;i<newAddr.length();i++) {
+        newAddr[i] = tolower(newAddr[i]);
+    }
+
+    if(!regex_match(newAddr, regex("([a-f]|\\d){12}"))) {
+
+        if(regex_match(newAddr, regex("(([a-f]|\\d){2}-){5}([a-f]|\\d){2}"))) {
+            //Separated by -
+            for(int i=2;i<=10;i+=2)
+                newAddr.erase(newAddr.begin() + i);
+
+        } else if(regex_match(newAddr, regex("(([a-f]|\\d){2}:){5}([a-f]|\\d){2}"))) {
+            //Separated by :
+            for(int i=2;i<=10;i+=2)
+                newAddr.erase(newAddr.begin() + i);
+
+        } else {
+            //Not a valid MAC Address
+            cout<<"Error: This MAC Address is invalid."<<endl;
+            return;
+        }
+    }
+
     //Change the MAC Address of the first 2 interfaces listed
     for(int i=0;i<=2;i++) {
         cout<<"Changing address of interface #" <<i<<endl;
