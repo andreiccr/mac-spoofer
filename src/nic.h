@@ -124,11 +124,9 @@ void EnableAllInterfaces() {
 
 
 void RestoreDefaultAddr() {
-    DisableAllInterfaces();
     system("reg delete HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4D36E972-E325-11CE-BFC1-08002BE10318}\\0000 /v NetworkAddress /f");
     system("reg delete HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4D36E972-E325-11CE-BFC1-08002BE10318}\\0001 /v NetworkAddress /f");
     system("reg delete HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4D36E972-E325-11CE-BFC1-08002BE10318}\\0002 /v NetworkAddress /f");
-    EnableAllInterfaces();
 }
 
 

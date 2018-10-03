@@ -8,6 +8,7 @@ using namespace std;
 const string TEMP_PATH = "\%USERPROFILE\%\\AppData\\Local\\Temp";
 
 int main(int argc, char **argv) {
+
     string new_mac;
     char c;
 
@@ -20,7 +21,9 @@ int main(int argc, char **argv) {
 
     if(c == 'r') {
         cout<<"Restoring original MAC Addresses..."<<endl;
+        DisableAllInterfaces();
         RestoreDefaultAddr();
+        EnableAllInterfaces();
         cout<<"Done.";
         return 0;
     } else if (c != 's') {
@@ -32,9 +35,7 @@ int main(int argc, char **argv) {
     cin>>new_mac;
 
     DisableAllInterfaces();
-
     ChangeAddr(new_mac);
-
     EnableAllInterfaces();
 
     PrintMAC();
