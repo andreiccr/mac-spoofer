@@ -11,17 +11,26 @@
 
 using namespace std;
 
-void PrintMAC() {
-    char *path = new char[PATH_MAX];
+const int nicNum = 3; // The first n interfaces as they appear in registry, will be modified.
+
+/* Redirects the output of the command in a temporary location in a file specified by 'filename' */
+const char* systemfout(const char *ocmd, const char* filename) {
+    char *path = new char[MAX_PATH];
     GetTempPathA(MAX_PATH, path);
-    strcat(path, "\\macs.txt");
+    strcat(path, "\\");
+    strcat(path, filename);
 
-    uint16_t cmd_len = strlen("getmac /fo table /nh > ") + strlen(path);
+    uint16_t cmd_len = strlen(ocmd) + strlen(path) + strlen(" > ");
     char *cmd = new char[cmd_len];
-    strcpy(cmd, "getmac /fo table /nh > ");
+    strcpy(cmd, ocmd);
+    strcat(cmd, " > ");
     strcat(cmd, path);
-
     system(cmd);
+    return path;
+}
+
+void PrintMAC() {
+    const char *path = systemfout("getmac /fo table /nh", "macs.txt");
 
     ifstream outputFile {path};
     string macs { istreambuf_iterator<char>(outputFile), istreambuf_iterator<char>() };
@@ -85,15 +94,7 @@ vector<string> ParseInterfaceNames(string interfaces) {
 }
 
 vector<string> GetInterfaceNames() {
-    char *path = new char[MAX_PATH];
-    GetTempPathA(MAX_PATH, path);
-    strcat(path, "\\intnames.txt");
-
-    uint16_t cmd_len = strlen("wmic nic get NetConnectionID | find /v \"\" > ") + strlen(path);
-    char *cmd = new char[cmd_len];
-    strcpy(cmd, "wmic nic get NetConnectionID | find /v \"\" > ");
-    strcat(cmd, path);
-    system(cmd);
+    const char *path = systemfout("wmic nic get NetConnectionID | find /v \"\"", "intnames.txt");
 
     ifstream interfaceFile {path};
     string inames { istreambuf_iterator<char>(interfaceFile), istreambuf_iterator<char>() };
@@ -124,9 +125,16 @@ void EnableAllInterfaces() {
 
 
 void RestoreDefaultAddr() {
-    system("reg delete HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4D36E972-E325-11CE-BFC1-08002BE10318}\\0000 /v NetworkAddress /f");
-    system("reg delete HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4D36E972-E325-11CE-BFC1-08002BE10318}\\0001 /v NetworkAddress /f");
-    system("reg delete HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4D36E972-E325-11CE-BFC1-08002BE10318}\\0002 /v NetworkAddress /f");
+    HKEY hKey;
+    LONG res;
+    for(int i=0;i<nicNum;i++) {
+        string path = "SYSTEM\\CurrentControlSet\\Control\\Class\\{4D36E972-E325-11CE-BFC1-08002BE10318}\\000" + to_string(i);
+        res = RegOpenKeyEx(HKEY_LOCAL_MACHINE, path.c_str() , 0, KEY_ALL_ACCESS, &hKey);
+        if (res == ERROR_SUCCESS) {
+            RegDeleteValueA(hKey, "NetworkAddress");
+            RegCloseKey(hKey);
+        }
+    }
 }
 
 
@@ -160,13 +168,29 @@ void ChangeAddr(string newAddr) {
         }
     }
 
-    //Change the MAC Address of the first 2 interfaces listed
-    for(int i=0;i<=2;i++) {
-        cout<<"Changing address of interface #" <<i<<endl;
-        string cmd = "reg add HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4D36E972-E325-11CE-BFC1-08002BE10318}\\000" + to_string(i) + " /v NetworkAddress /d " + newAddr + " /f";
+    HKEY hKey;
+    LONG res;
 
-        system(cmd.c_str());
+    for(int i=0;i<nicNum;i++) {
+        #ifdef _UNSTABLE
+            string path = "SYSTEM\\CurrentControlSet\\Control\\Class\\{4D36E972-E325-11CE-BFC1-08002BE10318}\\000" + to_string(i);
+            res = RegOpenKeyEx(HKEY_LOCAL_MACHINE, path.c_str() , 0, KEY_WRITE, &hKey);
+            if (res == ERROR_SUCCESS) {
+                res = RegSetValueEx(hKey, "NetworkAddress" , 0, REG_SZ, (BYTE *)newAddr.c_str(), sizeof(newAddr));
+                if(res == ERROR_SUCCESS) {
+                    cout<<"Changed MAC address of interface #"<<i<<" to "<<newAddr<<endl;
+                } else {
+                    cerr<<"Couldn't change MAC address of interface #"<<i<<"  Reason: "<<res<<endl;
+                }
+                RegCloseKey(hKey);
+            }
+        #else
+            string cmd = "reg add HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4D36E972-E325-11CE-BFC1-08002BE10318}\\000" + to_string(i) + " /v NetworkAddress /d " + newAddr + " /f";
+            system(cmd.c_str());
+        #endif // _DEBUG
     }
+
+
 }
 
 #endif
