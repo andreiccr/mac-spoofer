@@ -1,7 +1,6 @@
 #include <iostream>
-#include <windows.h>
 #include <string>
-#include "nic.h"
+#include "cmdctrl.h"
 
 using namespace std;
 
@@ -9,37 +8,17 @@ const string TEMP_PATH = "\%USERPROFILE\%\\AppData\\Local\\Temp";
 
 int main(int argc, char **argv) {
 
-    string new_mac;
-    char c;
+    string cmd;
+    short retcode = COM_END;
 
-    cout<<"List of MAC Addresses: ";
-    PrintMAC();
+    while(retcode != COM_EXIT) {
+        cout<<":>";
+        cin>>cmd;
 
-    cout<<endl;
-    cout<<"Spoof or Restore? (s/r) ";
-    cin>>c;
-
-    if(c == 'r') {
-        cout<<"Restoring original MAC Addresses..."<<endl;
-        DisableAllInterfaces();
-        RestoreDefaultAddr();
-        EnableAllInterfaces();
-        cout<<"Done.";
-        return 0;
-    } else if (c != 's') {
-        cout<<"Invalid operation!";
-        return 0;
+        retcode = ExecCom(cmd);
+        cin.clear();
+        cin.ignore(100, '\n');
     }
 
-    cout<<"Enter new MAC: ";
-    cin>>new_mac;
-
-    DisableAllInterfaces();
-    ChangeAddr(new_mac);
-    EnableAllInterfaces();
-
-    PrintMAC();
-
-    system("pause>nul");
     return 0;
 }
