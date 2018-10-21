@@ -1,17 +1,23 @@
 #ifndef _NIC_MAN
 #define _NIC_MAN
 
+#ifndef WINVER
+    #define WINVER 0x0600 //Needed for Win32 API newer features
+#endif
+
 #include <iostream>
 #include <fstream>
 #include <string>
 #include <vector>
 #include <regex>
 #include <windows.h>
+#include <iphlpapi.h>
 #include "text.h"
 
 using namespace std;
 
 const int nicNum = 3; // The first n interfaces as they appear in registry, will be modified.
+vector<string> activeAdapters; //This must store the active adapters names.
 
 /* Redirects the output of the command in a temporary location in a file specified by 'filename' */
 const char* systemfout(const char *ocmd, const char* filename) {
@@ -30,84 +36,76 @@ const char* systemfout(const char *ocmd, const char* filename) {
 }
 
 void PrintMAC() {
-    const char *path = systemfout("getmac /fo table /nh", "macs.txt");
 
-    ifstream outputFile {path};
-    string macs { istreambuf_iterator<char>(outputFile), istreambuf_iterator<char>() };
-    cout<<macs<<endl;
+    IP_ADAPTER_ADDRESSES AdapterAddr[64]; //First 64 NICs
+    DWORD bufLen = sizeof(AdapterAddr);
+    ULONG result;
 
-}
+    result = GetAdaptersAddresses(AF_INET, GAA_FLAG_SKIP_ANYCAST, NULL, AdapterAddr, &bufLen);
 
-vector<string> ParseInterfaceNames(string interfaces) {
-    int pos;
-    char buffer[256];
-    int i;
-    bool charfound, finished;
-    vector<string> ints ;
-    vector<string>::iterator it;
-
-    it = ints.begin();
-
-    finished = false;
-
-    while(!finished) {
-        pos = interfaces.find('\n');
-        i = pos;
-
-        charfound = false;
-        while(!charfound) {
-            if(isalnum(interfaces[i])) {
-                //Add everything in the array from this position to the right until a /r/n is found.
-                charfound = true;
-            }
-            else {
-                if(i+1 >= interfaces.length()) {
-                    finished = true;
-                    break;
-                }
-
-                i++;
-            }
-        }
-
-        if(finished) break;
-
-        interfaces = interfaces.substr(i);
-        i = 0;
-
-        if(charfound) {
-            while (interfaces[i] != '\r') {
-                buffer[i] = interfaces[i];
-                i++;
-            }
-
-            string element = buffer;
-            element = element.substr(0,i); //Keep only the text, not the entire 256 byte content.
-            element = rtrimStr(element);
-
-            it = ints.insert(it, element.substr(0,i));
-        }
+    if(result != ERROR_SUCCESS) {
+        cerr<<"Couldn't obtain adapter information"<<endl;
+        cerr<<"Failed to list physical addresses"<<endl;
+        return;
     }
 
-    return ints;
+    PIP_ADAPTER_ADDRESSES pAdapterAddr = AdapterAddr;
+
+    do {
+        //Print each BYTE given by PhysicalAddress array, because I'm too lazy to find a more elegant way.
+        for(int i=0;i<pAdapterAddr->PhysicalAddressLength;i++) {
+            if(pAdapterAddr->PhysicalAddress[i] <= 0xf)
+                printf("0");
+            printf("%x", pAdapterAddr->PhysicalAddress[i]);
+        }
+
+        wcout<<"  "<<pAdapterAddr->FriendlyName<<endl;
+        pAdapterAddr = pAdapterAddr->Next;
+
+    } while(pAdapterAddr);
 
 }
 
+string pwcharToString(PWCHAR wstr) {
+    wstring ws(wstr);
+    string str(ws.begin(), ws.end());
+    return str;
+}
+
+
 vector<string> GetInterfaceNames() {
-    const char *path = systemfout("wmic nic get NetConnectionID | find /v \"\"", "intnames.txt");
+    vector<string> nicNames;
+    vector<string>::iterator it = nicNames.begin();
 
-    ifstream interfaceFile {path};
-    string inames { istreambuf_iterator<char>(interfaceFile), istreambuf_iterator<char>() };
+     IP_ADAPTER_ADDRESSES AdapterAddr[64]; //First 64 NICs
+    DWORD bufLen = sizeof(AdapterAddr);
+    ULONG result;
 
-    vector<string> ints = ParseInterfaceNames(inames);
+    result = GetAdaptersAddresses(AF_INET, GAA_FLAG_SKIP_ANYCAST, NULL, AdapterAddr, &bufLen);
 
-    return ints;
+    if(result != ERROR_SUCCESS) {
+        cerr<<"Couldn't obtain adapter information"<<endl;
+        cerr<<"Failed to get adapter names"<<endl;
+        nicNames.insert(it, "###");
+        return nicNames;
+    }
+
+    PIP_ADAPTER_ADDRESSES pAdapterAddr = AdapterAddr;
+
+    do {
+        it = nicNames.insert(it, pwcharToString(pAdapterAddr->FriendlyName));
+        pAdapterAddr = pAdapterAddr->Next;
+
+    } while(pAdapterAddr);
+
+    return nicNames;
 }
 
 void DisableAllInterfaces() {
+    //Call GetInterfaceNames() before disabling all adapters and save them in activeAdapters.
+    activeAdapters = GetInterfaceNames();
 
-    vector<string> inames = GetInterfaceNames();
-    for(vector<string>::iterator it=inames.begin(); it!=inames.end(); it++) {
+    for(vector<string>::iterator it=activeAdapters.begin(); it!=activeAdapters.end(); it++) {
         string cmd = "netsh interface set interface \""+ *it +"\" disable";
         system(cmd.c_str());
         //cout<<"Disabled " << *it << " with command " << cmd <<endl;
@@ -116,10 +114,10 @@ void DisableAllInterfaces() {
 
 void EnableAllInterfaces() {
 
-    vector<string> inames = GetInterfaceNames();
-    for(vector<string>::iterator it=inames.begin(); it!=inames.end(); it++) {
+    for(vector<string>::iterator it=activeAdapters.begin(); it!=activeAdapters.end(); it++) {
         string cmd = "netsh interface set interface \""+ *it +"\" enable";
         system(cmd.c_str());
+        //cout<<"Enabled " << *it << " with command " << cmd <<endl;
     }
 }
 
