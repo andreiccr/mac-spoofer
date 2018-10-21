@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include "cmdctrl.h"
+#include "computer.h"
 
 using namespace std;
 
@@ -12,6 +13,7 @@ int main(int argc, char **argv) {
     short retcode = COM_END;
 
     while(retcode != COM_EXIT) {
+        PrintCurrentName();
         cout<<":>";
         cin>>cmd;
 

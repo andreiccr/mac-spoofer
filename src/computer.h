@@ -1,50 +1,34 @@
 #ifndef _COMPUTER_MAN
 #define _COMPUTER_MAN
 
+#include <windows.h>
 #include <string>
-#include "text.h"
 
-string GetCurrentName(void) {
+short GetCurrentName(char *name, short verbose=0) {
 
-    char *path = new char[MAX_PATH];
-    GetTempPathA(MAX_PATH, path);
-    strcat (path, "\\output.txt");
-
-    /*   Note: wmic outputs in unicode so there will be extra null bytes.
-     *   This is fixed by adding | find /v "" to the command.
-     *   Alternatively, wmic's output parameter could be used.
-    **/
-    uint16_t cmd_len = strlen("wmic computersystem get caption | find /v \"\" > ") + strlen(path);
-    char *cmd = new char[cmd_len];
-
-    strcpy(cmd, "wmic computersystem get caption | find /v \"\" > ");
-    strcat(cmd, path);
-
-    system(cmd);
-
-    ifstream outputFile {path};
-
-    if(!outputFile.is_open()) {
-        return " ";
+    char *n = (char*)malloc(sizeof(char) * (MAX_COMPUTERNAME_LENGTH+1));
+    DWORD s = sizeof(n) * (MAX_COMPUTERNAME_LENGTH + 1);
+    BOOL result = GetComputerNameA(n, &s);
+    if(result == 0) {
+        if(verbose)
+            cerr<<"Couldn't obtain the computer name. Error code: "<< hex<<GetLastError()<<endl;
+        return 0;
     }
-
-    string current_name { istreambuf_iterator<char>(outputFile), istreambuf_iterator<char>() };
-
-    current_name.erase(0, 8); //Remove the word "Caption"
-    current_name = ltrimStr(current_name);
-    outputFile.close();
-
-    return current_name;
+    strcpy(name, n);
+    free(n);
+    return 1;
 }
 
 
 void PrintCurrentName() {
-    string current_name = GetCurrentName();
-    if(current_name == " ") {
-        cout<<"PC name couldn't be retrieved."<<endl;
-    } else {
-        cout<<"Current name: "<<current_name<<endl;
+    char* current_name = new char[MAX_COMPUTERNAME_LENGTH+1];
+    short res = GetCurrentName(current_name);
+
+    if(res != 0) {
+        cout<<current_name;
     }
+
+    delete[] current_name;
 }
 
 void ChangeName(string currentName, string newName) {
