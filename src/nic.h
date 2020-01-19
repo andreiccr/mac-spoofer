@@ -16,7 +16,12 @@
 
 using namespace std;
 
-const int nicNum = 3; // The first n interfaces as they appear in registry, will be modified.
+/* 
+  The first n interfaces as they appear in registry, will be modified.
+  This is now used only if subkeys counting fails
+*/
+const int nicNum = 3; 
+
 vector<string> activeAdapters; //This must store the active adapters names.
 
 /* Redirects the output of the command in a temporary location in a file specified by 'filename' */
@@ -121,12 +126,35 @@ void EnableAllInterfaces() {
     }
 }
 
+//Returns the number of keys representing interfaces. Returns 0 on failure.
+DWORD CountInterfaces() {
+	HKEY hKey;
+    LONG res;
+	DWORD subKeys=0; //Number of keys representing interfaces. Substract by 2.
+	
+	res = RegOpenKeyEx(HKEY_LOCAL_MACHINE, "SYSTEM\\CurrentControlSet\\Control\\Class\\{4D36E972-E325-11CE-BFC1-08002BE10318}" , 0, KEY_ALL_ACCESS, &hKey);
+	
+	if(res == ERROR_SUCCESS) {
+		RegQueryInfoKey(hKey, NULL, NULL, NULL, &subKeys, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+	}
+	
+	return (subKeys>1)?(subKeys-2):0;
+}
+
 
 void RestoreDefaultAddr() {
     HKEY hKey;
     LONG res;
-    for(int i=0;i<nicNum;i++) {
-        string path = "SYSTEM\\CurrentControlSet\\Control\\Class\\{4D36E972-E325-11CE-BFC1-08002BE10318}\\000" + to_string(i);
+	string path = "";
+	DWORD subKeys = CountInterfaces();
+	if(subKeys==0) subKeys = nicNum; // Keys counting failed
+	
+    for(int i=0;i<subKeys;i++) {
+		if(i>=10)
+			path = "SYSTEM\\CurrentControlSet\\Control\\Class\\{4D36E972-E325-11CE-BFC1-08002BE10318}\\00" + to_string(i);
+		else
+			path = "SYSTEM\\CurrentControlSet\\Control\\Class\\{4D36E972-E325-11CE-BFC1-08002BE10318}\\000" + to_string(i);
+		
         res = RegOpenKeyEx(HKEY_LOCAL_MACHINE, path.c_str() , 0, KEY_ALL_ACCESS, &hKey);
         if (res == ERROR_SUCCESS) {
             RegDeleteValueA(hKey, "NetworkAddress");
@@ -168,8 +196,12 @@ void ChangeAddr(string newAddr) {
 
     HKEY hKey;
     LONG res;
-
-    for(int i=0;i<nicNum;i++) {
+	string cmd = "";
+	
+	DWORD subKeys = CountInterfaces();
+	if(subKeys==0) subKeys = nicNum; // Keys counting failed
+	
+    for(int i=0;i<subKeys;i++) {
         #ifdef _UNSTABLE
             string path = "SYSTEM\\CurrentControlSet\\Control\\Class\\{4D36E972-E325-11CE-BFC1-08002BE10318}\\000" + to_string(i);
             res = RegOpenKeyEx(HKEY_LOCAL_MACHINE, path.c_str() , 0, KEY_WRITE, &hKey);
@@ -183,7 +215,10 @@ void ChangeAddr(string newAddr) {
                 RegCloseKey(hKey);
             }
         #else
-            string cmd = "reg add HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4D36E972-E325-11CE-BFC1-08002BE10318}\\000" + to_string(i) + " /v NetworkAddress /d " + newAddr + " /f";
+			if(i>=10)
+				cmd = "reg add HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4D36E972-E325-11CE-BFC1-08002BE10318}\\00" + to_string(i) + " /v NetworkAddress /d " + newAddr + " /f";
+			else
+				cmd = "reg add HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4D36E972-E325-11CE-BFC1-08002BE10318}\\000" + to_string(i) + " /v NetworkAddress /d " + newAddr + " /f";
             system(cmd.c_str());
         #endif // _DEBUG
     }
