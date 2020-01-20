@@ -1,4 +1,5 @@
-Simple MAC address spoofer. Tested on Windows 10. Run as administrator.
+Simple MAC address spoofer for network adapters. Tested on Windows 7 and Windows 10.
 
+This changes the MAC addresses for ALL network adapters.
 
-Note: Only network adapters 0, 1 and 2 will be affected. Your MAC address might remain unchanged.
+**Run as administrator.** 
